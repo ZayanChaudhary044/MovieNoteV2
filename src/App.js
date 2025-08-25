@@ -36,7 +36,7 @@ const Navigation = () => {
                   to={path}
                   className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
                     isActive(path)
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+                      ? 'bg-gradient-to-br from-blue-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
                       : 'text-gray-300 hover:text-white hover:bg-gray-800 hover:shadow-md'
                   }`}
                 >
