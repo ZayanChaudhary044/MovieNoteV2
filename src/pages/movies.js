@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 // Enhanced Movies Component with better styling
 const Movies = ({ addToList = () => {} }) => {
