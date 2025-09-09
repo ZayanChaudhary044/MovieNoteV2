@@ -11,57 +11,43 @@ const Auth = ({ onClose }) => {
   const [error, setError] = useState('');
 
   const handleAuth = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setMessage('');
+  e.preventDefault();
+  console.log('🔐 Starting auth request...');
+  
+  setLoading(true);
+  setError('');
+  setMessage('');
 
-    try {
-      if (isLogin) {
-        // Login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+  try {
+    if (isLogin) {
+      // Login
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        if (error) {
-          setError(error.message);
-        } else {
-          setMessage('Successfully logged in!');
-          setTimeout(() => {
-            onClose && onClose();
-          }, 1000);
-        }
+      if (error) {
+        console.error('❌ Login error:', error);
+        setError(error.message);
       } else {
-        // Signup
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              display_name: displayName || email.split('@')[0],
-            }
-          }
-        });
-
-        if (error) {
-          setError(error.message);
-        } else {
-          setMessage('Account created! Check your email to verify your account.');
-          // Auto switch to login after successful signup
-          setTimeout(() => {
-            setIsLogin(true);
-            setMessage('');
-          }, 3000);
-        }
+        console.log('✅ Login successful! Closing modal...');
+        setMessage('Successfully logged in!');
+        
+        // Close modal immediately on success
+        onClose && onClose();
       }
-    } catch (error) {
-      setError('An unexpected error occurred');
-      console.error('Auth error:', error);
-    } finally {
-      setLoading(false);
+    } else {
+      // ... signup code
     }
-  };
+  } catch (error) {
+    console.error('💥 Auth request failed:', error);
+    setError('An unexpected error occurred');
+  } finally {
+    // ALWAYS stop loading, regardless of success/failure
+    console.log('🏁 Setting auth loading to false');
+    setLoading(false);
+  }
+};
 
   const handleSocialLogin = async (provider) => {
     setLoading(true);

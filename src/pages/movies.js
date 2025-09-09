@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
-// Enhanced Movies Component with better styling
-const Movies = ({ addToList = () => {} }) => {
+// Enhanced Movies Component with database integration
+const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) => {
   const [query, setQuery] = useState('');
   const [movies, setMovies] = useState([]);
   const [sortOption, setSortOption] = useState('popularity.desc');
@@ -68,29 +68,73 @@ const Movies = ({ addToList = () => {} }) => {
   };
 
   const handleAddToList = (movie) => {
+    if (!user) {
+      setNotification('Please sign in to add movies to your watchlist');
+      setTimeout(() => setNotification(''), 3000);
+      return;
+    }
+
     addToList(movie);
-    setNotification(`${movie.title} added to your list!`);
+    setNotification(`${movie.title} added to your watchlist!`);
     setTimeout(() => setNotification(''), 3000);
   };
 
+  // Check if movie is already in user's list
+  const isInWatchlist = (movieId) => {
+    return myList.some(movie => movie.id === movieId);
+  };
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} py-8 transition-colors duration-300`}>
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <div className="py-20">
+            <div className="text-6xl mb-6">🔐</div>
+            <h3 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+              Sign in to search and save movies
+            </h3>
+            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-8 text-lg`}>
+              Create your personal movie watchlist by signing into your account
+            </p>
+            <div className="space-y-4">
+              <div className={`${isDarkMode ? 'text-gray-500' : 'text-gray-500'} text-sm mt-4`}>
+                💡 Sign in to search movies, add them to your watchlist, and sync across devices
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-900 py-8">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} py-8 transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4">
         {/* Notification */}
         {notification && (
-          <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse">
-            ✅ {notification}
+          <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse text-white ${
+            notification.includes('sign in') ? 'bg-red-500' : 'bg-green-500'
+          }`}>
+            {notification.includes('sign in') ? '🔒' : '✅'} {notification}
           </div>
         )}
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4">🎬 Movie Search</h1>
-          <p className="text-gray-400">Discover your next favorite movie</p>
+          <h1 className={`text-4xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+            🎬 Movie Search
+          </h1>
+          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+            Discover your next favorite movie
+          </p>
+          <p className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+            ✅ Signed in as {user.email} • {myList.length} movies in watchlist
+          </p>
         </div>
 
         {/* Search Controls */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow-xl mb-8">
+        <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-xl mb-8 transition-colors duration-300`}>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <input
@@ -99,7 +143,11 @@ const Movies = ({ addToList = () => {} }) => {
                 onChange={handleChange}
                 onKeyPress={handleKeyPress}
                 placeholder="Search for movies..."
-                className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 placeholder-gray-400"
+                className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 placeholder-gray-400'
+                    : 'bg-gray-50 text-gray-900 border-gray-300 focus:border-purple-500 placeholder-gray-500'
+                }`}
               />
             </div>
             <button
@@ -118,13 +166,17 @@ const Movies = ({ addToList = () => {} }) => {
           
           {/* Sort Options */}
           <div className="mt-4">
-            <label className="block text-gray-300 text-sm font-medium mb-2">
+            <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium mb-2`}>
               Sort by:
             </label>
             <select
               value={sortOption}
               onChange={handleSortChange}
-              className="w-full md:w-auto px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+              className={`w-full md:w-auto px-4 py-2 rounded-lg border focus:outline-none transition-colors duration-300 ${
+                isDarkMode
+                  ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500'
+                  : 'bg-white text-gray-900 border-gray-300 focus:border-purple-500'
+              }`}
             >
               <option value="popularity.desc">Popularity: High to Low</option>
               <option value="popularity.asc">Popularity: Low to High</option>
@@ -141,7 +193,7 @@ const Movies = ({ addToList = () => {} }) => {
         {/* Loading */}
         {loading && (
           <div className="flex justify-center py-12">
-            <div className="flex items-center gap-3 text-white">
+            <div className={`flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
               <span className="text-lg">Searching for movies...</span>
             </div>
@@ -151,56 +203,79 @@ const Movies = ({ addToList = () => {} }) => {
         {/* Movies Grid */}
         {movies.length > 0 && !loading && (
           <>
-            <div className="mb-4 text-gray-400 text-center">
+            <div className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-center`}>
               Found {movies.length} {movies.length === 1 ? 'movie' : 'movies'}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {movies.map((movie) => (
-                <div key={movie.id} className="bg-gray-800 rounded-lg overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 hover:bg-gray-750">
-                  <div className="relative">
-                    {movie.poster_path ? (
-                      <img
-                        src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                        alt={movie.title}
-                        className="w-full h-80 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-80 bg-gray-700 flex items-center justify-center">
-                        <span className="text-6xl">🎬</span>
-                      </div>
-                    )}
-                    {movie.vote_average > 0 && (
-                      <div className="absolute top-2 right-2 bg-yellow-500 text-black px-2 py-1 rounded-full text-sm font-bold">
-                        ⭐ {movie.vote_average.toFixed(1)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-white font-bold text-lg mb-2 line-clamp-2 leading-tight">
-                      {movie.title}
-                    </h3>
-                    <div className="space-y-2 text-sm text-gray-300 mb-4">
-                      <p className="flex items-center gap-2">
-                        📅 <span>{movie.release_date || 'Release date unknown'}</span>
-                      </p>
-                      <p className="flex items-center gap-2">
-                        🌟 <span>{movie.vote_average ? `${movie.vote_average.toFixed(1)}/10` : 'Not rated'}</span>
-                      </p>
-                      {movie.overview && (
-                        <p className="text-gray-400 text-xs leading-relaxed line-clamp-3 mt-2">
-                          {movie.overview}
-                        </p>
+              {movies.map((movie) => {
+                const inWatchlist = isInWatchlist(movie.id);
+                
+                return (
+                  <div 
+                    key={movie.id} 
+                    className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}
+                  >
+                    <div className="relative">
+                      {movie.poster_path ? (
+                        <img
+                          src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                          alt={movie.title}
+                          className="w-full h-80 object-cover"
+                        />
+                      ) : (
+                        <div className={`w-full h-80 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
+                          <span className="text-6xl">🎬</span>
+                        </div>
+                      )}
+                      
+                      {/* Rating Badge */}
+                      {movie.vote_average > 0 && (
+                        <div className="absolute top-2 right-2 bg-yellow-500 text-black px-2 py-1 rounded-full text-sm font-bold">
+                          ⭐ {movie.vote_average.toFixed(1)}
+                        </div>
+                      )}
+                      
+                      {/* In Watchlist Badge */}
+                      {inWatchlist && (
+                        <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                          ✅ In List
+                        </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleAddToList(movie)}
-                      className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white py-2 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105"
-                    >
-                      ➕ Add to List
-                    </button>
+                    
+                    <div className="p-4">
+                      <h3 className={`${isDarkMode ? 'text-white' : 'text-gray-900'} font-bold text-lg mb-2 line-clamp-2 leading-tight`}>
+                        {movie.title}
+                      </h3>
+                      <div className={`space-y-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>
+                        <p className="flex items-center gap-2">
+                          📅 <span>{movie.release_date || 'Release date unknown'}</span>
+                        </p>
+                        <p className="flex items-center gap-2">
+                          🌟 <span>{movie.vote_average ? `${movie.vote_average.toFixed(1)}/10` : 'Not rated'}</span>
+                        </p>
+                        {movie.overview && (
+                          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'} text-xs leading-relaxed line-clamp-3 mt-2`}>
+                            {movie.overview}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => handleAddToList(movie)}
+                        disabled={inWatchlist}
+                        className={`w-full py-2 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 ${
+                          inWatchlist
+                            ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white'
+                        }`}
+                      >
+                        {inWatchlist ? '✅ Already Added' : '➕ Add to Watchlist'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -208,9 +283,15 @@ const Movies = ({ addToList = () => {} }) => {
         {/* No Results */}
         {!loading && movies.length === 0 && query && (
           <div className="text-center py-20">
-            <h3 className="text-2xl font-bold text-white mb-4">No movies found</h3>
-            <p className="text-gray-400 text-lg mb-2">No results for "{query}"</p>
-            <p className="text-gray-500">Try a different search term or check your spelling</p>
+            <h3 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+              No movies found
+            </h3>
+            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-lg mb-2`}>
+              No results for "{query}"
+            </p>
+            <p className={`${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+              Try a different search term or check your spelling
+            </p>
           </div>
         )}
 
@@ -218,8 +299,15 @@ const Movies = ({ addToList = () => {} }) => {
         {!loading && movies.length === 0 && !query && (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🎭</div>
-            <h3 className="text-2xl font-bold text-white mb-4">Start Your Movie Journey</h3>
-            <p className="text-gray-400 text-lg">Search for any movie above to get started!</p>
+            <h3 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+              Start Your Movie Journey
+            </h3>
+            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-lg mb-4`}>
+              Search for any movie above to add to your watchlist!
+            </p>
+            <div className={`${isDarkMode ? 'text-gray-500' : 'text-gray-500'} text-sm`}>
+              💡 Movies you add will be saved to your account and synced across devices
+            </div>
           </div>
         )}
       </div>

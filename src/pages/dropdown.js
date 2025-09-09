@@ -50,8 +50,9 @@ const UserDropdown = ({ user, onSignOut, onThemeToggle, isDarkMode = true }) => 
   };
 
   const handleSignOutClick = () => {
+    console.log('🔴 UserDropdown sign out clicked');
     setIsOpen(false);
-    onSignOut();
+    onSignOut(); // Call the function passed from App.js
   };
 
   return (

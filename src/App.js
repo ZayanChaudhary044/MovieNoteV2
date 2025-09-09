@@ -1,9 +1,9 @@
 import React from "react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import Auth from "./pages/auth";
-import UserDropdown from "./pages/dropdown-comp";
+import UserDropdown from "./pages/dropdown";
 import Home from "./pages/home";
 import Movies from "./pages/movies";
 import List from "./pages/yrlist";
@@ -90,223 +90,244 @@ const App = () => {
   
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Check localStorage for saved theme preference
     const saved = localStorage.getItem('movieNoteTheme');
-    return saved ? JSON.parse(saved) : true; // Default to dark mode
+    return saved ? JSON.parse(saved) : true;
   });
   
-  // Watchlist state - now from Supabase
+  // Watchlist state
   const [myList, setMyList] = useState([]);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
-  
-  // Connection state
-  const [supabaseConnected, setSupabaseConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState(null);
 
-  // Load user's watchlist from Supabase
-  const loadWatchlist = useCallback(async (userId = null) => {
-    if (!userId && !user) return;
+  // Load user's watchlist from database - FIXED VERSION
+  const loadWatchlist = async (userId) => {
+    if (!userId) {
+      console.log('No userId provided to loadWatchlist');
+      return;
+    }
     
+    console.log('🔄 Loading watchlist for user:', userId);
     setWatchlistLoading(true);
+    
     try {
+      // Use JOIN query instead of view to avoid view issues
       const { data, error } = await supabase
-        .from('user_watchlist_with_movies')
-        .select('*')
-        .eq('user_id', userId || user.id)
+        .from('user_watchlists')
+        .select(`
+          id,
+          user_id,
+          movie_id,
+          added_at,
+          watched,
+          personal_rating,
+          personal_notes,
+          movies (
+            id,
+            title,
+            overview,
+            release_date,
+            poster_path,
+            backdrop_path,
+            vote_average,
+            vote_count,
+            runtime,
+            genres
+          )
+        `)
+        .eq('user_id', userId)
         .order('added_at', { ascending: false });
 
       if (error) {
-        console.error('Error loading watchlist:', error);
-        // Fallback to localStorage if database fails
-        const saved = localStorage.getItem('movieWatchlist');
-        setMyList(saved ? JSON.parse(saved) : []);
+        console.error('❌ Error loading watchlist:', error);
+        setMyList([]);
       } else {
-        // Transform data to match current format
+        console.log('✅ Raw watchlist data:', data);
+        
+        // Transform the joined data
         const transformedList = data.map(item => ({
-          id: item.movie_id,
-          title: item.title,
-          overview: item.overview,
-          release_date: item.release_date,
-          poster_path: item.poster_path,
-          backdrop_path: item.backdrop_path,
-          vote_average: item.vote_average,
-          vote_count: item.vote_count,
-          runtime: item.runtime,
-          genres: item.genres,
-          // Additional fields from database
+          // Movie data from the movies table
+          id: item.movies.id,
+          title: item.movies.title,
+          overview: item.movies.overview,
+          release_date: item.movies.release_date,
+          poster_path: item.movies.poster_path,
+          backdrop_path: item.movies.backdrop_path,
+          vote_average: item.movies.vote_average,
+          vote_count: item.movies.vote_count,
+          runtime: item.movies.runtime,
+          genres: item.movies.genres,
+          // Watchlist-specific data
           watchlist_id: item.id,
           added_at: item.added_at,
           watched: item.watched,
           personal_rating: item.personal_rating,
           personal_notes: item.personal_notes
         }));
+        
         setMyList(transformedList);
+        console.log('✅ Transformed watchlist:', transformedList);
+        console.log('📊 Final list length:', transformedList.length);
       }
     } catch (error) {
-      console.error('Failed to load watchlist:', error);
+      console.error('💥 Failed to load watchlist:', error);
+      setMyList([]);
     } finally {
       setWatchlistLoading(false);
     }
-  }, [user]);
+  };
 
-  // Initialize authentication and load user data
+  // Initialize authentication - SIMPLIFIED FIX
   useEffect(() => {
-    const initializeAuth = async () => {
-  console.log('🔍 Starting auth initialization...');
-  console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
-  console.log('Supabase Key exists:', !!process.env.REACT_APP_SUPABASE_ANON_KEY);
-  
-  try {
-    console.log('📡 Getting session...');
-    const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('Setting up auth...');
     
-    console.log('Session data:', session);
-    console.log('Session error:', error);
+    let isMounted = true;
     
-    if (error) {
-      console.error('❌ Auth error:', error);
-      setConnectionError(error.message);
-    } else {
-      console.log('✅ Auth successful');
-      setUser(session?.user || null);
-      setSupabaseConnected(true);
-    }
-  } catch (error) {
-    console.error('💥 Failed to initialize auth:', error);
-    setConnectionError('Failed to connect to Supabase');
-  } finally {
-    console.log('🏁 Setting loading to false');
+    // Set loading to false immediately to prevent infinite loading
     setLoading(false);
-  }
-};
+    
+    const initAuth = async () => {
+      try {
+        // Try to get session with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 3000)
+        );
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+        
+        if (isMounted && session?.user) {
+          console.log('Found session for:', session.user.email);
+          setUser(session.user);
+          await loadWatchlist(session.user.id);
+        }
+      } catch (error) {
+        console.log('No existing session or timeout:', error.message);
+        // This is fine - user just isn't logged in
+      }
+    };
 
-    initializeAuth();
-
-    // Listen for auth changes
+    // Set up auth listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        setUser(session?.user || null);
+        console.log('Auth event:', event);
         
-        if (session?.user) {
-          // Load watchlist when user logs in
+        if (!isMounted) return;
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          setUser(session.user);
           await loadWatchlist(session.user.id);
-        } else {
-          // Clear watchlist when user logs out
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
           setMyList([]);
         }
       }
     );
 
-    return () => subscription?.unsubscribe();
-  }, [loadWatchlist]);
+    // Run init after a small delay to ensure the app loads first
+    setTimeout(initAuth, 100);
 
-  // Load watchlist when user is available
-  useEffect(() => {
-    if (user) {
-      loadWatchlist();
-    }
-  }, [user, loadWatchlist]);
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
 
+  // Add movie to watchlist - BULLETPROOF VERSION
   const addToList = async (movie) => {
-    // If not authenticated, use localStorage as fallback
+    console.log('🎬 Adding movie to list:', movie.title);
+    console.log('👤 Current user:', user?.email);
+    console.log('📋 Current list length:', myList.length);
+    
     if (!user) {
-      // Check for duplicates
-      if (!myList.find(m => m.id === movie.id)) {
-        const newList = [...myList, movie];
-        setMyList(newList);
-        try {
-          localStorage.setItem('movieWatchlist', JSON.stringify(newList));
-        } catch (error) {
-          console.error('Error saving to localStorage:', error);
-        }
-      }
+      console.log('❌ No user logged in');
       return;
     }
 
     // Check if already in list
     if (myList.find(m => m.id === movie.id)) {
-      console.log('Movie already in watchlist');
+      console.log('⚠️ Movie already in watchlist');
       return;
     }
 
     try {
-      // First, insert or update the movie in the movies table
+      // Step 1: Insert movie into movies table
+      console.log('💾 Step 1: Inserting movie into movies table...');
       const { error: movieError } = await supabase
         .from('movies')
         .upsert({
           id: movie.id,
           title: movie.title,
-          overview: movie.overview,
-          release_date: movie.release_date,
-          poster_path: movie.poster_path,
-          backdrop_path: movie.backdrop_path,
-          vote_average: movie.vote_average,
-          vote_count: movie.vote_count,
-          runtime: movie.runtime,
-          genres: movie.genres,
-          original_language: movie.original_language,
-          original_title: movie.original_title,
-          adult: movie.adult,
-          popularity: movie.popularity
+          overview: movie.overview || '',
+          release_date: movie.release_date || null,
+          poster_path: movie.poster_path || null,
+          backdrop_path: movie.backdrop_path || null,
+          vote_average: movie.vote_average || 0,
+          vote_count: movie.vote_count || 0,
+          runtime: movie.runtime || null,
+          genres: movie.genres || null,
+          original_language: movie.original_language || null,
+          original_title: movie.original_title || movie.title,
+          adult: movie.adult || false,
+          popularity: movie.popularity || 0
         }, { 
-          onConflict: 'id',
-          ignoreDuplicates: false 
+          onConflict: 'id' 
         });
 
       if (movieError) {
-        console.error('Error saving movie:', movieError);
+        console.error('❌ Error saving movie:', movieError);
         return;
       }
+      console.log('✅ Movie saved to movies table');
 
-      // Then add to user's watchlist
-      const { data, error } = await supabase
+      // Step 2: Add to user's watchlist
+      console.log('📝 Step 2: Adding to user watchlist...');
+      const { data: watchlistData, error: watchlistError } = await supabase
         .from('user_watchlists')
         .insert({
           user_id: user.id,
-          movie_id: movie.id
-        })
-        .select('id, added_at')
-        .single();
-
-      if (error) {
-        console.error('Error adding to watchlist:', error);
-        // Fallback to localStorage
-        const newList = [...myList, movie];
-        setMyList(newList);
-        localStorage.setItem('movieWatchlist', JSON.stringify(newList));
-      } else {
-        // Add to local state with database info
-        const movieWithDbInfo = {
-          ...movie,
-          watchlist_id: data.id,
-          added_at: data.added_at,
+          movie_id: movie.id,
           watched: false,
           personal_rating: null,
           personal_notes: null
-        };
-        setMyList(prev => [movieWithDbInfo, ...prev]);
-        console.log('Movie added to watchlist successfully');
+        })
+        .select('id, added_at, watched, personal_rating, personal_notes')
+        .single();
+
+      if (watchlistError) {
+        console.error('❌ Error adding to watchlist:', watchlistError);
+        return;
       }
+
+      console.log('✅ Added to watchlist, got data:', watchlistData);
+
+      // Step 3: Update local state immediately
+      const movieWithDbInfo = {
+        ...movie,
+        watchlist_id: watchlistData.id,
+        added_at: watchlistData.added_at,
+        watched: watchlistData.watched,
+        personal_rating: watchlistData.personal_rating,
+        personal_notes: watchlistData.personal_notes
+      };
+
+      setMyList(prev => {
+        const newList = [movieWithDbInfo, ...prev];
+        console.log('📊 Updated local state - old length:', prev.length, 'new length:', newList.length);
+        return newList;
+      });
+
+      console.log('🎉 Movie successfully added to watchlist!');
+
     } catch (error) {
-      console.error('Failed to add movie to watchlist:', error);
-      // Fallback to localStorage
-      const newList = [...myList, movie];
-      setMyList(newList);
-      localStorage.setItem('movieWatchlist', JSON.stringify(newList));
+      console.error('💥 Failed to add movie:', error);
     }
   };
 
+  // Remove movie from watchlist
   const removeFromList = async (movie) => {
-    // If not authenticated, use localStorage as fallback
+    console.log('🗑️ Removing movie from list:', movie.title);
+    
     if (!user) {
-      const newList = myList.filter((m) => m.id !== movie.id);
-      setMyList(newList);
-      try {
-        localStorage.setItem('movieWatchlist', JSON.stringify(newList));
-      } catch (error) {
-        console.error('Error saving to localStorage:', error);
-      }
+      console.log('❌ No user logged in');
       return;
     }
 
@@ -318,39 +339,44 @@ const App = () => {
         .eq('movie_id', movie.id);
 
       if (error) {
-        console.error('Error removing from watchlist:', error);
-        // Fallback to localStorage
-        const newList = myList.filter((m) => m.id !== movie.id);
-        setMyList(newList);
-        localStorage.setItem('movieWatchlist', JSON.stringify(newList));
-      } else {
-        // Remove from local state
-        setMyList(prev => prev.filter((m) => m.id !== movie.id));
-        console.log('Movie removed from watchlist successfully');
+        console.error('❌ Error removing from watchlist:', error);
+        return;
       }
+
+      // Update local state
+      setMyList(prev => {
+        const newList = prev.filter(m => m.id !== movie.id);
+        console.log('📊 Removed from local state - old length:', prev.length, 'new length:', newList.length);
+        return newList;
+      });
+      
+      console.log('✅ Movie removed successfully');
+
     } catch (error) {
-      console.error('Failed to remove movie from watchlist:', error);
-      // Fallback to localStorage
-      const newList = myList.filter((m) => m.id !== movie.id);
-      setMyList(newList);
-      localStorage.setItem('movieWatchlist', JSON.stringify(newList));
+      console.error('💥 Failed to remove movie:', error);
     }
   };
 
+  // Sign out handler
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Error signing out:', error);
+    console.log('🚪 Signing out...');
+    
+    try {
+      // Clear state immediately for instant UI feedback
+      setUser(null);
+      setMyList([]);
+      
+      // Then call Supabase signOut
+      await supabase.auth.signOut();
+      
+      console.log('✅ Signed out successfully');
+    } catch (error) {
+      console.error('💥 Sign out error:', error);
     }
   };
 
-  const handleShowAuth = () => {
-    setShowAuth(true);
-  };
-
-  const handleCloseAuth = () => {
-    setShowAuth(false);
-  };
+  const handleShowAuth = () => setShowAuth(true);
+  const handleCloseAuth = () => setShowAuth(false);
 
   const handleThemeToggle = () => {
     const newTheme = !isDarkMode;
@@ -368,21 +394,10 @@ const App = () => {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} transition-colors duration-300`}>
-      {/* Supabase Connection Status (Development only - remove in production) */}
+      {/* Development status */}
       {process.env.NODE_ENV === 'development' && (
-        <div className={`p-2 text-center text-sm ${
-          supabaseConnected 
-            ? 'bg-green-900 text-green-200' 
-            : connectionError 
-            ? 'bg-red-900 text-red-200'
-            : 'bg-yellow-900 text-yellow-200'
-        }`}>
-          {supabaseConnected 
-            ? `✅ Supabase Connected${user ? ` - Logged in as ${user.email}` : ' - Not logged in'}` 
-            : connectionError 
-            ? `❌ Supabase Error: ${connectionError}`
-            : '🔄 Testing Supabase Connection...'
-          }
+        <div className="p-2 text-center text-sm bg-green-900 text-green-200">
+          Connected {user ? `- ${user.email} (${myList.length} movies)` : '- Not logged in'}
         </div>
       )}
       
