@@ -7,21 +7,22 @@ import UserDropdown from "./pages/dropdown";
 import Home from "./pages/home";
 import Movies from "./pages/movies";
 import List from "./pages/yrlist";
+import Profile from "./pages/profile";
 
-// Enhanced Navigation Component with Tailwind
+// Enhanced Navigation Component with Light Blue Theme
 const Navigation = ({ user, onSignOut, onShowAuth, isDarkMode, onThemeToggle }) => {
   const location = useLocation();
   
   const isActive = (path) => location.pathname === path;
   
   return (
-    <nav className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} shadow-lg sticky top-0 z-50 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'} transition-colors duration-300`}>
+    <nav className={`${isDarkMode ? 'bg-gray-900' : 'bg-blue-50'} shadow-lg sticky top-0 z-50 border-b ${isDarkMode ? 'border-gray-800' : 'border-blue-200'} transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo/Brand */}
           <Link 
             to="/" 
-            className={`text-2xl md:text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} bg-clip-text text-transparent hover:from-purple-300 hover:via-pink-300 hover:to-indigo-300 transition-all duration-300`}
+            className={`text-2xl md:text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-blue-900'} bg-clip-text text-transparent hover:from-purple-300 hover:via-pink-300 hover:to-indigo-300 transition-all duration-300`}
           >
             MovieNote
           </Link>
@@ -42,7 +43,7 @@ const Navigation = ({ user, onSignOut, onShowAuth, isDarkMode, onThemeToggle }) 
                         ? 'bg-gradient-to-br from-blue-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
                         : isDarkMode 
                         ? 'text-gray-300 hover:text-white hover:bg-gray-800 hover:shadow-md'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:shadow-md'
+                        : 'text-blue-700 hover:text-blue-900 hover:bg-blue-100 hover:shadow-md'
                     }`}
                   >
                     <span className="text-sm md:text-base">{icon}</span>
@@ -289,21 +290,16 @@ const App = () => {
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex items-center justify-center transition-colors duration-300`}>
-        <div className={`${isDarkMode ? 'text-white' : 'text-gray-900'} text-xl`}>Loading MovieNote...</div>
+      <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-blue-50'} flex items-center justify-center transition-colors duration-300`}>
+        <div className={`${isDarkMode ? 'text-white' : 'text-blue-900'} text-xl`}>Loading MovieNote...</div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} transition-colors duration-300`}>
-      {/* Development status */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="p-2 text-center text-sm bg-green-900 text-green-200">
-          Connected {user ? `- ${user.email} (${myList.length} movies)` : '- Not logged in'}
-        </div>
-      )}
-      
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-blue-50'} transition-colors duration-300`}>
+
+
       <Router>
         <Navigation 
           user={user} 
@@ -338,6 +334,16 @@ const App = () => {
                 />
               } 
             />
+            <Route 
+  path="/profile" 
+  element={
+    <Profile 
+      user={user}
+      isDarkMode={isDarkMode}
+      onThemeToggle={handleThemeToggle}
+    />
+  } 
+/>
           </Routes>
         </main>
 

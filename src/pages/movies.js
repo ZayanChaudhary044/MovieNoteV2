@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-// Enhanced Movies Component with database integration
 const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) => {
   const [query, setQuery] = useState('');
   const [movies, setMovies] = useState([]);
@@ -26,7 +25,7 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
     setLoading(true);
     try {
       const response = await fetch(
-        `https://api.themoviedb.org/3/search/movie?api_key=edb25027eda51739f1898a8064bd3f67&query=${query}`
+        `https://api.themoviedb.org/3/search/movie?api_key=edb25027eda51739f1898a8064bd3f67&query=${encodeURIComponent(query)}`
       );
       const data = await response.json();
       const sortedMovies = sortMovies(data.results || [], sortOption);
@@ -45,9 +44,9 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
       case 'popularity.asc':
         return sortedMovies.sort((a, b) => a.popularity - b.popularity);
       case 'release_date.desc':
-        return sortedMovies.sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
+        return sortedMovies.sort((a, b) => new Date(b.release_date || 0) - new Date(a.release_date || 0));
       case 'release_date.asc':
-        return sortedMovies.sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
+        return sortedMovies.sort((a, b) => new Date(a.release_date || 0) - new Date(b.release_date || 0));
       case 'alphabet.desc':
         return sortedMovies.sort((a, b) => b.title.localeCompare(a.title));
       case 'alphabet.asc':
@@ -79,37 +78,12 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
     setTimeout(() => setNotification(''), 3000);
   };
 
-  // Check if movie is already in user's list
   const isInWatchlist = (movieId) => {
     return myList.some(movie => movie.id === movieId);
   };
 
-  // Show login prompt if not authenticated
-  if (!user) {
-    return (
-      <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} py-8 transition-colors duration-300`}>
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="py-20">
-            <div className="text-6xl mb-6">🔐</div>
-            <h3 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
-              Sign in to search and save movies
-            </h3>
-            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-8 text-lg`}>
-              Create your personal movie watchlist by signing into your account
-            </p>
-            <div className="space-y-4">
-              <div className={`${isDarkMode ? 'text-gray-500' : 'text-gray-500'} text-sm mt-4`}>
-                💡 Sign in to search movies, add them to your watchlist, and sync across devices
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} py-8 transition-colors duration-300`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-blue-50'} py-8 transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4">
         {/* Notification */}
         {notification && (
@@ -122,19 +96,25 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className={`text-4xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+          <h1 className={`text-4xl font-bold ${isDarkMode ? 'text-white' : 'text-blue-900'} mb-4`}>
             🎬 Movie Search
           </h1>
-          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+          <p className={`${isDarkMode ? 'text-gray-400' : 'text-blue-600'} mb-2`}>
             Discover your next favorite movie
           </p>
-          <p className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
-            ✅ Signed in as {user.email} • {myList.length} movies in watchlist
-          </p>
+          {user ? (
+            <p className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+              ✅ Signed in as {user.email} • {myList.length} movies in watchlist
+            </p>
+          ) : (
+            <p className={`text-sm ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+              🔓 Sign in to save movies to your watchlist
+            </p>
+          )}
         </div>
 
         {/* Search Controls */}
-        <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-xl mb-8 transition-colors duration-300`}>
+        <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-blue-100'} p-6 rounded-lg shadow-xl mb-8 transition-colors duration-300`}>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <input
@@ -146,7 +126,7 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
                 className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300 ${
                   isDarkMode 
                     ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 placeholder-gray-400'
-                    : 'bg-gray-50 text-gray-900 border-gray-300 focus:border-purple-500 placeholder-gray-500'
+                    : 'bg-blue-50 text-blue-900 border-blue-300 focus:border-purple-500 placeholder-blue-500'
                 }`}
               />
             </div>
@@ -165,35 +145,37 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
           </div>
           
           {/* Sort Options */}
-          <div className="mt-4">
-            <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium mb-2`}>
-              Sort by:
-            </label>
-            <select
-              value={sortOption}
-              onChange={handleSortChange}
-              className={`w-full md:w-auto px-4 py-2 rounded-lg border focus:outline-none transition-colors duration-300 ${
-                isDarkMode
-                  ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500'
-                  : 'bg-white text-gray-900 border-gray-300 focus:border-purple-500'
-              }`}
-            >
-              <option value="popularity.desc">Popularity: High to Low</option>
-              <option value="popularity.asc">Popularity: Low to High</option>
-              <option value="vote_average.desc">Rating: High to Low</option>
-              <option value="vote_average.asc">Rating: Low to High</option>
-              <option value="release_date.desc">Newest First</option>
-              <option value="release_date.asc">Oldest First</option>
-              <option value="alphabet.asc">A to Z</option>
-              <option value="alphabet.desc">Z to A</option>
-            </select>
-          </div>
+          {movies.length > 0 && (
+            <div className="mt-4">
+              <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-blue-700'} text-sm font-medium mb-2`}>
+                Sort by:
+              </label>
+              <select
+                value={sortOption}
+                onChange={handleSortChange}
+                className={`w-full md:w-auto px-4 py-2 rounded-lg border focus:outline-none transition-colors duration-300 ${
+                  isDarkMode
+                    ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500'
+                    : 'bg-blue-50 text-blue-900 border-blue-300 focus:border-purple-500'
+                }`}
+              >
+                <option value="popularity.desc">Popularity: High to Low</option>
+                <option value="popularity.asc">Popularity: Low to High</option>
+                <option value="vote_average.desc">Rating: High to Low</option>
+                <option value="vote_average.asc">Rating: Low to High</option>
+                <option value="release_date.desc">Newest First</option>
+                <option value="release_date.asc">Oldest First</option>
+                <option value="alphabet.asc">A to Z</option>
+                <option value="alphabet.desc">Z to A</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Loading */}
         {loading && (
           <div className="flex justify-center py-12">
-            <div className={`flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <div className={`flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-blue-900'}`}>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
               <span className="text-lg">Searching for movies...</span>
             </div>
@@ -203,8 +185,9 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
         {/* Movies Grid */}
         {movies.length > 0 && !loading && (
           <>
-            <div className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-center`}>
+            <div className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-blue-600'} text-center`}>
               Found {movies.length} {movies.length === 1 ? 'movie' : 'movies'}
+              {query && ` for "${query}"`}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {movies.map((movie) => {
@@ -213,7 +196,7 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
                 return (
                   <div 
                     key={movie.id} 
-                    className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}
+                    className={`${isDarkMode ? 'bg-gray-800' : 'bg-blue-100'} rounded-lg overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}
                   >
                     <div className="relative">
                       {movie.poster_path ? (
@@ -223,7 +206,7 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
                           className="w-full h-80 object-cover"
                         />
                       ) : (
-                        <div className={`w-full h-80 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
+                        <div className={`w-full h-80 ${isDarkMode ? 'bg-gray-700' : 'bg-blue-200'} flex items-center justify-center`}>
                           <span className="text-6xl">🎬</span>
                         </div>
                       )}
@@ -244,10 +227,10 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
                     </div>
                     
                     <div className="p-4">
-                      <h3 className={`${isDarkMode ? 'text-white' : 'text-gray-900'} font-bold text-lg mb-2 line-clamp-2 leading-tight`}>
+                      <h3 className={`${isDarkMode ? 'text-white' : 'text-blue-900'} font-bold text-lg mb-2 line-clamp-2 leading-tight`}>
                         {movie.title}
                       </h3>
-                      <div className={`space-y-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>
+                      <div className={`space-y-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-blue-700'} mb-4`}>
                         <p className="flex items-center gap-2">
                           📅 <span>{movie.release_date || 'Release date unknown'}</span>
                         </p>
@@ -255,7 +238,7 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
                           🌟 <span>{movie.vote_average ? `${movie.vote_average.toFixed(1)}/10` : 'Not rated'}</span>
                         </p>
                         {movie.overview && (
-                          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'} text-xs leading-relaxed line-clamp-3 mt-2`}>
+                          <p className={`${isDarkMode ? 'text-gray-400' : 'text-blue-600'} text-xs leading-relaxed line-clamp-3 mt-2`}>
                             {movie.overview}
                           </p>
                         )}
@@ -283,15 +266,22 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
         {/* No Results */}
         {!loading && movies.length === 0 && query && (
           <div className="text-center py-20">
-            <h3 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+            <div className="text-6xl mb-4">🔍</div>
+            <h3 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-blue-900'} mb-4`}>
               No movies found
             </h3>
-            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-lg mb-2`}>
+            <p className={`${isDarkMode ? 'text-gray-400' : 'text-blue-600'} text-lg mb-2`}>
               No results for "{query}"
             </p>
-            <p className={`${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+            <p className={`${isDarkMode ? 'text-gray-500' : 'text-blue-500'} mb-4`}>
               Try a different search term or check your spelling
             </p>
+            <button
+              onClick={() => setQuery('')}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300"
+            >
+              Clear Search
+            </button>
           </div>
         )}
 
@@ -299,15 +289,21 @@ const Movies = ({ addToList = () => {}, myList = [], user, isDarkMode = true }) 
         {!loading && movies.length === 0 && !query && (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🎭</div>
-            <h3 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+            <h3 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-blue-900'} mb-4`}>
               Start Your Movie Journey
             </h3>
-            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-lg mb-4`}>
-              Search for any movie above to add to your watchlist!
+            <p className={`${isDarkMode ? 'text-gray-400' : 'text-blue-600'} text-lg mb-4`}>
+              Search for any movie above to discover new titles!
             </p>
-            <div className={`${isDarkMode ? 'text-gray-500' : 'text-gray-500'} text-sm`}>
-              💡 Movies you add will be saved to your account and synced across devices
-            </div>
+            {user ? (
+              <div className={`${isDarkMode ? 'text-gray-500' : 'text-blue-500'} text-sm`}>
+                🎬 Movies you add will be saved to your watchlist and synced across devices
+              </div>
+            ) : (
+              <div className={`${isDarkMode ? 'text-gray-500' : 'text-blue-500'} text-sm`}>
+                🔐 Sign in to save movies to your personal watchlist
+              </div>
+            )}
           </div>
         )}
       </div>
