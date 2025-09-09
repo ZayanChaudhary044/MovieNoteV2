@@ -11,21 +11,21 @@ import List from "./pages/yrlist";
 // Enhanced Navigation Component with Tailwind
 const Navigation = ({ user, onSignOut, onShowAuth, isDarkMode, onThemeToggle }) => {
   const location = useLocation();
-  
+
   const isActive = (path) => location.pathname === path;
-  
+
   return (
     <nav className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} shadow-lg sticky top-0 z-50 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'} transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo/Brand */}
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className={`text-2xl md:text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} bg-clip-text text-transparent hover:from-purple-300 hover:via-pink-300 hover:to-indigo-300 transition-all duration-300`}
           >
             MovieNote
           </Link>
-          
+
           {/* Navigation Links */}
           <div className="flex items-center space-x-4">
             <ul className="flex space-x-1">
@@ -37,13 +37,12 @@ const Navigation = ({ user, onSignOut, onShowAuth, isDarkMode, onThemeToggle }) 
                 <li key={path}>
                   <Link
                     to={path}
-                    className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
-                      isActive(path)
+                    className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${isActive(path)
                         ? 'bg-gradient-to-br from-blue-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
-                        : isDarkMode 
-                        ? 'text-gray-300 hover:text-white hover:bg-gray-800 hover:shadow-md'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:shadow-md'
-                    }`}
+                        : isDarkMode
+                          ? 'text-gray-300 hover:text-white hover:bg-gray-800 hover:shadow-md'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:shadow-md'
+                      }`}
                   >
                     <span className="text-sm md:text-base">{icon}</span>
                     <span className="hidden sm:inline text-sm md:text-base">{label}</span>
@@ -55,11 +54,11 @@ const Navigation = ({ user, onSignOut, onShowAuth, isDarkMode, onThemeToggle }) 
                 </li>
               ))}
             </ul>
-            
+
             {/* User Authentication */}
             {user ? (
-              <UserDropdown 
-                user={user} 
+              <UserDropdown
+                user={user}
                 onSignOut={onSignOut}
                 onThemeToggle={onThemeToggle}
                 isDarkMode={isDarkMode}
@@ -75,7 +74,7 @@ const Navigation = ({ user, onSignOut, onShowAuth, isDarkMode, onThemeToggle }) 
           </div>
         </div>
       </div>
-      
+
       {/* Subtle gradient line */}
       <div className="h-px bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50"></div>
     </nav>
@@ -87,29 +86,29 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
-  
+  const [authError, setAuthError] = useState(null);
+
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('movieNoteTheme');
     return saved ? JSON.parse(saved) : true;
   });
-  
+
   // Watchlist state
   const [myList, setMyList] = useState([]);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
 
-  // Load user's watchlist from database - FIXED VERSION
+  // Load user's watchlist from database - IMPROVED VERSION
   const loadWatchlist = async (userId) => {
-    if (!userId) {
-      console.log('No userId provided to loadWatchlist');
+    if (!userId || watchlistLoading) {
+      console.log('Skipping watchlist load - no userId or already loading');
       return;
     }
-    
+
     console.log('🔄 Loading watchlist for user:', userId);
     setWatchlistLoading(true);
-    
+
     try {
-      // Use JOIN query instead of view to avoid view issues
       const { data, error } = await supabase
         .from('user_watchlists')
         .select(`
@@ -139,34 +138,35 @@ const App = () => {
       if (error) {
         console.error('❌ Error loading watchlist:', error);
         setMyList([]);
-      } else {
-        console.log('✅ Raw watchlist data:', data);
-        
-        // Transform the joined data
-        const transformedList = data.map(item => ({
-          // Movie data from the movies table
-          id: item.movies.id,
-          title: item.movies.title,
-          overview: item.movies.overview,
-          release_date: item.movies.release_date,
-          poster_path: item.movies.poster_path,
-          backdrop_path: item.movies.backdrop_path,
-          vote_average: item.movies.vote_average,
-          vote_count: item.movies.vote_count,
-          runtime: item.movies.runtime,
-          genres: item.movies.genres,
-          // Watchlist-specific data
-          watchlist_id: item.id,
-          added_at: item.added_at,
-          watched: item.watched,
-          personal_rating: item.personal_rating,
-          personal_notes: item.personal_notes
-        }));
-        
-        setMyList(transformedList);
-        console.log('✅ Transformed watchlist:', transformedList);
-        console.log('📊 Final list length:', transformedList.length);
+        return;
       }
+
+      // Ensure we have data and movies exist
+      const validData = data?.filter(item => item.movies) || [];
+
+      const transformedList = validData.map(item => ({
+        // Movie data from the movies table
+        id: item.movies.id,
+        title: item.movies.title,
+        overview: item.movies.overview,
+        release_date: item.movies.release_date,
+        poster_path: item.movies.poster_path,
+        backdrop_path: item.movies.backdrop_path,
+        vote_average: item.movies.vote_average,
+        vote_count: item.movies.vote_count,
+        runtime: item.movies.runtime,
+        genres: item.movies.genres,
+        // Watchlist-specific data
+        watchlist_id: item.id,
+        added_at: item.added_at,
+        watched: item.watched,
+        personal_rating: item.personal_rating,
+        personal_notes: item.personal_notes
+      }));
+
+      setMyList(transformedList);
+      console.log('✅ Watchlist loaded:', transformedList.length, 'movies');
+
     } catch (error) {
       console.error('💥 Failed to load watchlist:', error);
       setMyList([]);
@@ -175,55 +175,72 @@ const App = () => {
     }
   };
 
-  // Initialize authentication - SIMPLIFIED FIX
+  // Initialize authentication - SIMPLIFIED AND FIXED
   useEffect(() => {
-    console.log('Setting up auth...');
-    
+    console.log('🔧 Setting up authentication...');
+
     let isMounted = true;
-    
-    // Set loading to false immediately to prevent infinite loading
-    setLoading(false);
-    
+
     const initAuth = async () => {
       try {
-        // Try to get session with timeout
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 3000)
-        );
-        
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-        
-        if (isMounted && session?.user) {
-          console.log('Found session for:', session.user.email);
-          setUser(session.user);
-          await loadWatchlist(session.user.id);
+        // Get current session
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Auth error:', error);
+          setAuthError(error.message);
+        }
+
+        if (isMounted) {
+          if (session?.user) {
+            console.log('✅ Found existing session:', session.user.email);
+            setUser(session.user);
+            // Load watchlist after setting user
+            setTimeout(() => loadWatchlist(session.user.id), 100);
+          } else {
+            console.log('ℹ️ No existing session');
+          }
+          setLoading(false);
         }
       } catch (error) {
-        console.log('No existing session or timeout:', error.message);
-        // This is fine - user just isn't logged in
+        console.error('💥 Auth initialization error:', error);
+        if (isMounted) {
+          setAuthError(error.message);
+          setLoading(false);
+        }
       }
     };
 
-    // Set up auth listener
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event);
-        
+        console.log('🔄 Auth state change:', event);
+
         if (!isMounted) return;
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
-          await loadWatchlist(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setMyList([]);
+
+        try {
+          if (event === 'SIGNED_IN' && session?.user) {
+            console.log('✅ User signed in:', session.user.email);
+            setUser(session.user);
+            setAuthError(null);
+            await loadWatchlist(session.user.id);
+          } else if (event === 'SIGNED_OUT') {
+            console.log('👋 User signed out');
+            setUser(null);
+            setMyList([]);
+            setAuthError(null);
+          } else if (event === 'TOKEN_REFRESHED') {
+            console.log('🔄 Token refreshed');
+          }
+        } catch (error) {
+          console.error('💥 Auth state change error:', error);
+          setAuthError(error.message);
         }
       }
     );
 
-    // Run init after a small delay to ensure the app loads first
-    setTimeout(initAuth, 100);
+    // Initialize auth
+    initAuth();
 
     return () => {
       isMounted = false;
@@ -231,26 +248,23 @@ const App = () => {
     };
   }, []);
 
-  // Add movie to watchlist - BULLETPROOF VERSION
+  // Add movie to watchlist - IMPROVED ERROR HANDLING
   const addToList = async (movie) => {
-    console.log('🎬 Adding movie to list:', movie.title);
-    console.log('👤 Current user:', user?.email);
-    console.log('📋 Current list length:', myList.length);
-    
     if (!user) {
       console.log('❌ No user logged in');
-      return;
+      return { success: false, error: 'Not logged in' };
     }
 
     // Check if already in list
     if (myList.find(m => m.id === movie.id)) {
       console.log('⚠️ Movie already in watchlist');
-      return;
+      return { success: false, error: 'Already in watchlist' };
     }
 
+    console.log('🎬 Adding movie to list:', movie.title);
+
     try {
-      // Step 1: Insert movie into movies table
-      console.log('💾 Step 1: Inserting movie into movies table...');
+      // Step 1: Insert movie into movies table (upsert to handle duplicates)
       const { error: movieError } = await supabase
         .from('movies')
         .upsert({
@@ -268,18 +282,17 @@ const App = () => {
           original_title: movie.original_title || movie.title,
           adult: movie.adult || false,
           popularity: movie.popularity || 0
-        }, { 
-          onConflict: 'id' 
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false
         });
 
       if (movieError) {
         console.error('❌ Error saving movie:', movieError);
-        return;
+        return { success: false, error: 'Failed to save movie' };
       }
-      console.log('✅ Movie saved to movies table');
 
       // Step 2: Add to user's watchlist
-      console.log('📝 Step 2: Adding to user watchlist...');
       const { data: watchlistData, error: watchlistError } = await supabase
         .from('user_watchlists')
         .insert({
@@ -294,12 +307,10 @@ const App = () => {
 
       if (watchlistError) {
         console.error('❌ Error adding to watchlist:', watchlistError);
-        return;
+        return { success: false, error: 'Failed to add to watchlist' };
       }
 
-      console.log('✅ Added to watchlist, got data:', watchlistData);
-
-      // Step 3: Update local state immediately
+      // Step 3: Update local state
       const movieWithDbInfo = {
         ...movie,
         watchlist_id: watchlistData.id,
@@ -309,27 +320,25 @@ const App = () => {
         personal_notes: watchlistData.personal_notes
       };
 
-      setMyList(prev => {
-        const newList = [movieWithDbInfo, ...prev];
-        console.log('📊 Updated local state - old length:', prev.length, 'new length:', newList.length);
-        return newList;
-      });
-
+      setMyList(prev => [movieWithDbInfo, ...prev]);
       console.log('🎉 Movie successfully added to watchlist!');
+
+      return { success: true };
 
     } catch (error) {
       console.error('💥 Failed to add movie:', error);
+      return { success: false, error: error.message };
     }
   };
 
-  // Remove movie from watchlist
+  // Remove movie from watchlist - IMPROVED
   const removeFromList = async (movie) => {
-    console.log('🗑️ Removing movie from list:', movie.title);
-    
     if (!user) {
       console.log('❌ No user logged in');
-      return;
+      return { success: false, error: 'Not logged in' };
     }
+
+    console.log('🗑️ Removing movie from list:', movie.title);
 
     try {
       const { error } = await supabase
@@ -340,35 +349,39 @@ const App = () => {
 
       if (error) {
         console.error('❌ Error removing from watchlist:', error);
-        return;
+        return { success: false, error: 'Failed to remove from watchlist' };
       }
 
       // Update local state
-      setMyList(prev => {
-        const newList = prev.filter(m => m.id !== movie.id);
-        console.log('📊 Removed from local state - old length:', prev.length, 'new length:', newList.length);
-        return newList;
-      });
-      
+      setMyList(prev => prev.filter(m => m.id !== movie.id));
       console.log('✅ Movie removed successfully');
+
+      return { success: true };
 
     } catch (error) {
       console.error('💥 Failed to remove movie:', error);
+      return { success: false, error: error.message };
     }
   };
 
-  // Sign out handler
+  // Sign out handler - IMPROVED
   const handleSignOut = async () => {
     console.log('🚪 Signing out...');
-    
+
     try {
-      // Clear state immediately for instant UI feedback
+      // Clear state first for immediate UI feedback
       setUser(null);
       setMyList([]);
-      
+      setAuthError(null);
+
       // Then call Supabase signOut
-      await supabase.auth.signOut();
-      
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('Sign out error:', error);
+        // Don't show this error to user since state is already cleared
+      }
+
       console.log('✅ Signed out successfully');
     } catch (error) {
       console.error('💥 Sign out error:', error);
@@ -384,10 +397,19 @@ const App = () => {
     localStorage.setItem('movieNoteTheme', JSON.stringify(newTheme));
   };
 
+  // Show loading screen
   if (loading) {
     return (
       <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex items-center justify-center transition-colors duration-300`}>
-        <div className={`${isDarkMode ? 'text-white' : 'text-gray-900'} text-xl`}>Loading MovieNote...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <div className={`${isDarkMode ? 'text-white' : 'text-gray-900'} text-xl`}>Loading MovieNote...</div>
+          {authError && (
+            <div className="mt-4 text-red-500 text-sm">
+              Connection issue: {authError}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -398,13 +420,14 @@ const App = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="p-2 text-center text-sm bg-green-900 text-green-200">
           Connected {user ? `- ${user.email} (${myList.length} movies)` : '- Not logged in'}
+          {authError && <span className="ml-4 text-red-300">Auth Error: {authError}</span>}
         </div>
       )}
-      
+
       <Router>
-        <Navigation 
-          user={user} 
-          onSignOut={handleSignOut} 
+        <Navigation
+          user={user}
+          onSignOut={handleSignOut}
           onShowAuth={handleShowAuth}
           isDarkMode={isDarkMode}
           onThemeToggle={handleThemeToggle}
@@ -412,28 +435,28 @@ const App = () => {
         <main className="min-h-screen">
           <Routes>
             <Route path="/" element={<Home user={user} isDarkMode={isDarkMode} />} />
-            <Route 
-              path="/movies" 
+            <Route
+              path="/movies"
               element={
-                <Movies 
-                  addToList={addToList} 
+                <Movies
+                  addToList={addToList}
                   myList={myList}
                   user={user}
                   isDarkMode={isDarkMode}
                 />
-              } 
+              }
             />
-            <Route 
-              path="/yrlist" 
+            <Route
+              path="/yrlist"
               element={
-                <List 
-                  myList={myList} 
+                <List
+                  myList={myList}
                   removeFromList={removeFromList}
                   user={user}
                   loading={watchlistLoading}
                   isDarkMode={isDarkMode}
                 />
-              } 
+              }
             />
           </Routes>
         </main>

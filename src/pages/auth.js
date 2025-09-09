@@ -11,62 +11,126 @@ const Auth = ({ onClose }) => {
   const [error, setError] = useState('');
 
   const handleAuth = async (e) => {
-  e.preventDefault();
-  console.log('🔐 Starting auth request...');
-  
-  setLoading(true);
-  setError('');
-  setMessage('');
-
-  try {
-    if (isLogin) {
-      // Login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('❌ Login error:', error);
-        setError(error.message);
-      } else {
-        console.log('✅ Login successful! Closing modal...');
-        setMessage('Successfully logged in!');
-        
-        // Close modal immediately on success
-        onClose && onClose();
-      }
-    } else {
-      // ... signup code
+    e.preventDefault();
+    console.log('🔐 Starting auth request...');
+    
+    // Validation
+    if (!email.trim() || !password.trim()) {
+      setError('Email and password are required');
+      return;
     }
-  } catch (error) {
-    console.error('💥 Auth request failed:', error);
-    setError('An unexpected error occurred');
-  } finally {
-    // ALWAYS stop loading, regardless of success/failure
-    console.log('🏁 Setting auth loading to false');
-    setLoading(false);
-  }
-};
 
-  const handleSocialLogin = async (provider) => {
+    if (!isLogin && password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    
     setLoading(true);
     setError('');
+    setMessage('');
+
+    try {
+      if (isLogin) {
+        // Login
+        console.log('📧 Attempting login for:', email);
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) {
+          console.error('❌ Login error:', error);
+          // Provide user-friendly error messages
+          if (error.message.includes('Invalid login credentials')) {
+            setError('Invalid email or password. Please check your credentials.');
+          } else if (error.message.includes('Email not confirmed')) {
+            setError('Please check your email and click the confirmation link.');
+          } else {
+            setError(error.message);
+          }
+        } else if (data?.user) {
+          console.log('✅ Login successful! User:', data.user.email);
+          setMessage('Successfully logged in!');
+          
+          // Close modal after a brief delay to show success message
+          setTimeout(() => {
+            onClose && onClose();
+          }, 1000);
+        }
+      } else {
+        // Signup
+        console.log('📝 Attempting signup for:', email);
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: {
+              display_name: displayName.trim() || null,
+            }
+          }
+        });
+
+        if (error) {
+          console.error('❌ Signup error:', error);
+          // Provide user-friendly error messages
+          if (error.message.includes('User already registered')) {
+            setError('An account with this email already exists. Try signing in instead.');
+          } else if (error.message.includes('Password should be at least')) {
+            setError('Password must be at least 6 characters long.');
+          } else if (error.message.includes('Invalid email')) {
+            setError('Please enter a valid email address.');
+          } else {
+            setError(error.message);
+          }
+        } else if (data?.user) {
+          console.log('✅ Signup successful! User:', data.user.email);
+          
+          // Check if email confirmation is required
+          if (data.user && !data.session) {
+            setMessage('Account created! Please check your email and click the confirmation link to complete your registration.');
+          } else {
+            setMessage('Account created successfully!');
+            // Close modal after a brief delay
+            setTimeout(() => {
+              onClose && onClose();
+            }, 1500);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('💥 Auth request failed:', error);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      // ALWAYS stop loading, regardless of success/failure
+      console.log('🏁 Setting auth loading to false');
+      setLoading(false);
+    }
+  };
+
+  const handleSocialLogin = async (provider) => {
+    console.log(`🔗 Attempting ${provider} login...`);
+    setLoading(true);
+    setError('');
+    setMessage('');
 
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: window.location.origin
+          redirectTo: `${window.location.origin}`,
         }
       });
 
       if (error) {
-        setError(error.message);
+        console.error(`❌ ${provider} login error:`, error);
+        setError(`Failed to login with ${provider}. Please try again.`);
+      } else {
+        console.log(`✅ ${provider} login initiated`);
+        // OAuth will redirect, so we don't need to do anything else here
       }
     } catch (error) {
-      setError('Failed to login with ' + provider);
-      console.error('Social login error:', error);
+      console.error(`💥 ${provider} login error:`, error);
+      setError(`Failed to login with ${provider}. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -85,6 +149,18 @@ const Auth = ({ onClose }) => {
     resetForm();
   };
 
+  // Close modal on escape key
+  React.useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700 shadow-2xl">
@@ -96,7 +172,8 @@ const Auth = ({ onClose }) => {
           {onClose && (
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white text-2xl font-bold"
+              className="text-gray-400 hover:text-white text-2xl font-bold transition-colors"
+              aria-label="Close"
             >
               ×
             </button>
@@ -140,12 +217,18 @@ const Auth = ({ onClose }) => {
         {/* Error/Success Messages */}
         {error && (
           <div className="mb-4 p-3 bg-red-900 border border-red-600 text-red-200 rounded-lg text-sm">
-            {error}
+            <div className="flex items-start gap-2">
+              <span className="text-red-400 font-bold">⚠️</span>
+              <span>{error}</span>
+            </div>
           </div>
         )}
         {message && (
           <div className="mb-4 p-3 bg-green-900 border border-green-600 text-green-200 rounded-lg text-sm">
-            {message}
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 font-bold">✅</span>
+              <span>{message}</span>
+            </div>
           </div>
         )}
 
@@ -160,37 +243,41 @@ const Auth = ({ onClose }) => {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                disabled={loading}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 placeholder="How should we call you?"
+                maxLength={50}
               />
             </div>
           )}
 
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">
-              Email
+              Email *
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
               required
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
               placeholder="your@email.com"
             />
           </div>
 
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">
-              Password
+              Password *
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
               required
               minLength={6}
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
               placeholder="••••••••"
             />
             {!isLogin && (
@@ -202,7 +289,7 @@ const Auth = ({ onClose }) => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !email.trim() || !password.trim()}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 disabled:cursor-not-allowed"
           >
             {loading ? (
@@ -220,7 +307,8 @@ const Auth = ({ onClose }) => {
         <div className="mt-6 text-center">
           <button
             onClick={toggleMode}
-            className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+            disabled={loading}
+            className="text-blue-400 hover:text-blue-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLogin 
               ? "Don't have an account? Sign up" 
